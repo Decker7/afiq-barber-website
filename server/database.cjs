@@ -1,29 +1,24 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { sql } = require('@vercel/postgres');
 
-const dbPath = path.resolve(__dirname, '../afiq-barber.db');
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error opening database ' + dbPath + ': ' + err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-        db.run(`CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            service TEXT NOT NULL,
-            date TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )`,
-            (err) => {
-                if (err) {
-                    console.error('Error creating table: ' + err.message);
-                } else {
-                    console.log('Bookings table ready.');
-                }
-            });
+// Initialize the database table if it doesn't exist
+async function initDB() {
+    try {
+        await sql`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        service TEXT NOT NULL,
+        date TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+        console.log('Bookings table ready (Postgres).');
+    } catch (error) {
+        console.error('Error initializing database:', error);
     }
-});
+}
 
-module.exports = db;
+initDB();
+
+module.exports = { sql };

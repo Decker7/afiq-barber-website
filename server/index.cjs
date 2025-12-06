@@ -1,31 +1,29 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const db = require('./database.cjs');
+const { sql } = require('./database.cjs');
 
 const app = express();
-const PORT = 3000;
 
+// Allow CORS from anywhere (for now) or specify your Vercel domain
 app.use(cors());
 app.use(bodyParser.json());
 
 // Get all bookings (for testing/admin)
-app.get('/api/bookings', (req, res) => {
-    const sql = "SELECT * FROM bookings ORDER BY created_at DESC";
-    db.all(sql, [], (err, rows) => {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
+app.get('/api/bookings', async (req, res) => {
+    try {
+        const { rows } = await sql`SELECT * FROM bookings ORDER BY created_at DESC`;
         res.json({
             "message": "success",
             "data": rows
-        })
-    });
+        });
+    } catch (err) {
+        res.status(400).json({ "error": err.message });
+    }
 });
 
 // Create a new booking
-app.post('/api/bookings', (req, res) => {
+app.post('/api/bookings', async (req, res) => {
     const { name, email, service, date } = req.body;
 
     if (!name || !email || !service || !date) {
@@ -33,22 +31,29 @@ app.post('/api/bookings', (req, res) => {
         return;
     }
 
-    const sql = 'INSERT INTO bookings (name, email, service, date) VALUES (?,?,?,?)';
-    const params = [name, email, service, date];
+    try {
+        const result = await sql`
+            INSERT INTO bookings (name, email, service, date) 
+            VALUES (${name}, ${email}, ${service}, ${date})
+            RETURNING id
+        `;
 
-    db.run(sql, params, function (err, result) {
-        if (err) {
-            res.status(400).json({ "error": err.message })
-            return;
-        }
         res.json({
             "message": "success",
             "data": req.body,
-            "id": this.lastID
-        })
-    });
+            "id": result.rows[0].id
+        });
+    } catch (err) {
+        res.status(400).json({ "error": err.message });
+    }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+// Export the app for Vercel (don't listen if imported)
+if (require.main === module) {
+    const PORT = 3000;
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
